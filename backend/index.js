@@ -1,75 +1,76 @@
+import "dotenv/config";
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
-import helmet from "helmet";
+import OpenAI from "openai";
 import rateLimit from "express-rate-limit";
-import { OpenAI } from "openai";
+import helmet from "helmet";
 
 const app = express();
 
-dotenv.config();
+// Security middleware
 app.use(helmet());
-
 app.use(
     cors({
         origin: process.env.FRONTEND_URL || "http://localhost:3000",
-        credentials: true
+        credentials: true,
     })
-)
+);
+app.use(express.json({ limit: "10mb" }));
 
+// Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: "Too many requests from this IP, please try again after 15 minutes"
-})
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: "Too many requests from this IP, please try again later.",
+});
 app.use(limiter);
 
-const API_KEY = process.env.NEBIUS_API_KEY
+const API_KEY = process.env.NEBIUS_API_KEY;
 
 const client = new OpenAI({
-    baseURL: 'https://api.tokenfactory.nebius.com/v1/',
+    baseURL: "https://api.studio.nebius.com/v1/",
     apiKey: API_KEY,
 });
 
-
-
-app.use(express.json({ limit: "10mb" }));
-
-app.post("/api/explain-code", (req, res) => {
+// Code explanation endpoint
+app.post("/api/explain-code", async (req, res) => {
     try {
         const { code, language } = req.body;
-        if (!code || !language) {
-            return res.status(400).json({ success: false, message: "Both code and language are required." });
+
+        if (!code) {
+            return res.status(400).json({ error: "Code is required" });
         }
 
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message })
+        const messages = [
+            {
+                role: "user",
+                content: `Please explain this ${language || ""
+                    } code in simple terms:\n\n\`\`\`${language || ""}\n${code}\n\`\`\``,
+            },
+        ];
+
+        const response = await client.chat.completions.create({
+            model: "openai/gpt-oss-120b",
+            messages,
+            temperature: 0.3,
+            max_tokens: 4000,
+        });
+        const explanation = response?.choices[0]?.message?.content || response?.choices[0]?.message?.reasoning_content;
+
+        if (!explanation) {
+            return res.status(500).json({ error: "Failed to explain code" });
+        }
+
+        res.json({ explanation, language: language || "unknown" });
+    } catch (err) {
+        console.error("Code Explain API Error:", err);
+        res.status(500).json({ error: "Server error", details: err.message });
     }
-})
+});
 
+const PORT = process.env.PORT || 3002;
 
-
-
-client.chat.completions.create({
-    "model": "openai/gpt-oss-120b",
-    "messages": [
-        {
-            "role": "system",
-            "content": "SYSTEM_PROMPT"
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "USER_MESSAGE"
-                }
-            ]
-        }
-    ]
-})
-    .then((response) => console.log(response));
-
-app.listen(process.env.PORT || 3000, () => {
-    console.log(`Server is running on port ${process.env.PORT || 3000}`);
-})
+app.listen(PORT, () => {
+    console.log(`Enhanced API server listening on http://localhost:${PORT}`);
+    console.log(`API Key configured: ${!!API_KEY}`);
+});
