@@ -1,6 +1,5 @@
-"use server";
-// 👆 This tells React / Next.js that this function runs on the SERVER, not in the browser.
-// That means it can safely talk to APIs, databases, secrets, etc.
+// This function mocks a server action or calls an API
+// It runs in the browser in this Vite setup
 
 export async function explainCode(prevState, formData) {
     // 👆 This is a SERVER ACTION
