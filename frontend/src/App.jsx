@@ -1,13 +1,11 @@
-import React from 'react'
+import CodeEntry from "./components/CodeEntry";
 
 const App = () => {
   return (
-    <div>
-      <h1 class="text-3xl font-bold underline">
-        Hello world!
-      </h1>
-    </div>
-  )
-}
+    <>
+      <CodeEntry />
+    </>
+  );
+};
 
-export default App
+export default App;
